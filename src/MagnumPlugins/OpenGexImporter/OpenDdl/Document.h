@@ -31,7 +31,7 @@
 
 #include <string>
 #include <vector>
-#include <Corrade/Containers/Array.h>
+#include <Corrade/Containers/ArrayView.h>
 #include <MagnumExternal/Optional/optional.hpp>
 
 #include "MagnumPlugins/OpenGexImporter/OpenDdl/OpenDdl.h"
@@ -42,16 +42,16 @@ namespace Magnum { namespace OpenDdl {
 /**
 @brief Character literal
 
-Just a wrapper around @ref Corrade::Containers::ArrayReference which ensures
+Just a wrapper around @ref Corrade::Containers::ArrayView which ensures
 that character literals have proper size.
 */
-struct CharacterLiteral: Containers::ArrayReference<const char> {
+struct CharacterLiteral: Containers::ArrayView<const char> {
     /** @brief Constructor */
     /* GCC 4.6 doesn't like {} here, also size conflicts with the member */
     #ifdef CORRADE_GCC46_COMPATIBILITY
     #define size size_
     #endif
-    template<std::size_t size> constexpr CharacterLiteral(const char(&string)[size]): Containers::ArrayReference<const char>(string, size - 1) {}
+    template<std::size_t size> constexpr CharacterLiteral(const char(&string)[size]): Containers::ArrayView<const char>(string, size - 1) {}
     #ifdef CORRADE_GCC46_COMPATIBILITY
     #undef size
     #endif
@@ -167,7 +167,7 @@ for(OpenDdl::Structure geometryObject: d.childrenOf(OpenGex::GeometryObject)) {
             // error ...
         }
 
-        Containers::ArrayReference<const Float> vertexArray = vertexArray->firstChild().asArray<Float>();
+        Containers::ArrayView<const Float> vertexArray = vertexArray->firstChild().asArray<Float>();
         // ...
 
     } else {
@@ -266,13 +266,13 @@ if(attrib == "position") {
 }
 
 // Parse vertex array data
-Containers::ArrayReference<const Float> data = vertexArray.firstChild().asArray<Float>();
+Containers::ArrayView<const Float> data = vertexArray.firstChild().asArray<Float>();
 // ...
 @endcode
 
-@requires_gl On OpenGL ES the `double` type is not recognized. Additionally,
-    due to JavaScript limitations, on @ref MAGNUM_TARGET_WEBGL "WebGL" the
-    `unsigned_int64` and `int64` types are not recognized.
+@requires_gl On OpenGL ES and WebGL the `double` type is not recognized.
+    Additionally, due to JavaScript limitations, on WebGL the `unsigned_int64`
+    and `int64` types are not recognized.
 */
 class Document {
     /* GCC 4.6 needs the class keyword */
@@ -320,7 +320,7 @@ class Document {
          * parse call.
          */
         /** @todo some sane way to ensure that the initializer lists are valid for whole Document lifetime */
-        bool parse(Containers::ArrayReference<const char> data, std::initializer_list<CharacterLiteral> structureIdentifiers, std::initializer_list<CharacterLiteral> propertyIdentifiers);
+        bool parse(Containers::ArrayView<const char> data, std::initializer_list<CharacterLiteral> structureIdentifiers, std::initializer_list<CharacterLiteral> propertyIdentifiers);
 
         /** @brief Whether the document is empty */
         bool isEmpty() { return _structures.empty(); }
@@ -376,7 +376,7 @@ class Document {
 
         /** @overload */
         std::optional<Structure> findFirstChildOf(std::initializer_list<Int> identifiers) const;
-        std::optional<Structure> findFirstChildOf(Containers::ArrayReference<const Int> identifiers) const; /**< @overload */
+        std::optional<Structure> findFirstChildOf(Containers::ArrayView<const Int> identifiers) const; /**< @overload */
 
         /**
          * @brief First custom top-level structure of given type
@@ -428,14 +428,14 @@ class Document {
         struct PropertyData;
         struct StructureData;
 
-        const char* parseProperty(Containers::ArrayReference<const char> data, std::vector<std::pair<std::size_t, Containers::ArrayReference<const char>>>& references, std::string& buffer, Int position, Implementation::ParseError& error);
-        std::pair<const char*, std::size_t> parseStructure(std::size_t parent, Containers::ArrayReference<const char> data, std::vector<std::pair<std::size_t, Containers::ArrayReference<const char>>>& references, std::string& buffer, Implementation::ParseError& error);
-        const char* parseStructureList(std::size_t parent, Containers::ArrayReference<const char> data, std::vector<std::pair<std::size_t, Containers::ArrayReference<const char>>>& references, std::string& buffer, Implementation::ParseError& error);
+        const char* parseProperty(Containers::ArrayView<const char> data, std::vector<std::pair<std::size_t, Containers::ArrayView<const char>>>& references, std::string& buffer, Int position, Implementation::ParseError& error);
+        std::pair<const char*, std::size_t> parseStructure(std::size_t parent, Containers::ArrayView<const char> data, std::vector<std::pair<std::size_t, Containers::ArrayView<const char>>>& references, std::string& buffer, Implementation::ParseError& error);
+        const char* parseStructureList(std::size_t parent, Containers::ArrayView<const char> data, std::vector<std::pair<std::size_t, Containers::ArrayView<const char>>>& references, std::string& buffer, Implementation::ParseError& error);
 
-        std::size_t dereference(std::size_t originatingStructure, Containers::ArrayReference<const char> reference) const;
+        std::size_t dereference(std::size_t originatingStructure, Containers::ArrayView<const char> reference) const;
 
-        bool validateLevel(std::optional<Structure> first, Containers::ArrayReference<const std::pair<Int, std::pair<Int, Int>>> allowedStructures, Containers::ArrayReference<const Validation::Structure> structures, std::vector<Int>& counts) const;
-        bool validateStructure(Structure structure, const Validation::Structure& validation, Containers::ArrayReference<const Validation::Structure> structures, std::vector<Int>& counts) const;
+        bool validateLevel(std::optional<Structure> first, Containers::ArrayView<const std::pair<Int, std::pair<Int, Int>>> allowedStructures, Containers::ArrayView<const Validation::Structure> structures, std::vector<Int>& counts) const;
+        bool validateStructure(Structure structure, const Validation::Structure& validation, Containers::ArrayView<const Validation::Structure> structures, std::vector<Int>& counts) const;
 
         const char* structureName(Int identifier) const;
         const char* propertyName(Int identifier) const;
@@ -467,8 +467,8 @@ class Document {
         std::vector<PropertyData> _properties;
         std::vector<StructureData> _structures;
 
-        Containers::ArrayReference<const CharacterLiteral> _structureIdentifiers;
-        Containers::ArrayReference<const CharacterLiteral> _propertyIdentifiers;
+        Containers::ArrayView<const CharacterLiteral> _structureIdentifiers;
+        Containers::ArrayView<const CharacterLiteral> _propertyIdentifiers;
 };
 
 #ifndef DOXYGEN_GENERATING_OUTPUT

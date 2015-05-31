@@ -39,7 +39,7 @@ namespace Magnum { namespace Trade {
 Imports the [OpenDDL](http://openddl.org)-based [OpenGEX](http://opengex.org)
 format.
 
-Supports importing of mesh, texture and image data.
+Supports importing of scene, object, camera, mesh, texture and image data.
 
 This plugin depends on @ref AnyImageImporter plugin. It is built if
 `WITH_OPENGEXIMPORTER` is enabled when building Magnum Plugins. To use dynamic
@@ -124,13 +124,16 @@ class OpenGexImporter: public AbstractImporter {
         Features doFeatures() const override;
 
         bool doIsOpened() const override;
-        void doOpenData(Containers::ArrayReference<const char> data) override;
+        void doOpenData(Containers::ArrayView<const char> data) override;
         void doOpenFile(const std::string& filename) override;
         void doClose() override;
 
         Int doDefaultScene() override;
         UnsignedInt doSceneCount() const override;
         std::optional<SceneData> doScene(UnsignedInt id) override;
+
+        UnsignedInt doCameraCount() const override;
+        std::optional<CameraData> doCamera(UnsignedInt id) override;
 
         UnsignedInt doObject3DCount() const override;
         Int doObject3DForName(const std::string& name) override;

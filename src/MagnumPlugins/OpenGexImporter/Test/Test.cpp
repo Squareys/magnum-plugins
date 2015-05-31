@@ -24,7 +24,7 @@
 */
 
 #include <sstream>
-#include <Corrade/Containers/Array.h>
+#include <Corrade/Containers/ArrayView.h>
 #include <Corrade/TestSuite/Tester.h>
 #include <Corrade/Utility/Directory.h>
 #include <Magnum/Mesh.h>
@@ -37,6 +37,7 @@
 #include <Magnum/Trade/PhongMaterialData.h>
 #include <Magnum/Trade/SceneData.h>
 #include <Magnum/Trade/TextureData.h>
+#include <Magnum/Trade/CameraData.h>
 
 #include "MagnumPlugins/OpenGexImporter/OpenGexImporter.h"
 #include "MagnumPlugins/OpenGexImporter/OpenDdl/Document.h"
@@ -53,7 +54,11 @@ struct OpenGexImporterTest: public TestSuite::Tester {
     void openValidationError();
     void openInvalidMetric();
 
+    void camera();
+    void cameraMetrics();
+
     void object();
+    void objectCamera();
     void objectMesh();
     void objectTransformation();
     void objectTranslation();
@@ -94,7 +99,11 @@ OpenGexImporterTest::OpenGexImporterTest() {
               &OpenGexImporterTest::openValidationError,
               &OpenGexImporterTest::openInvalidMetric,
 
+              &OpenGexImporterTest::camera,
+              &OpenGexImporterTest::cameraMetrics,
+
               &OpenGexImporterTest::object,
+              &OpenGexImporterTest::objectCamera,
               &OpenGexImporterTest::objectMesh,
               &OpenGexImporterTest::objectTransformation,
               &OpenGexImporterTest::objectTranslation,
@@ -181,6 +190,47 @@ Metric (key = "distance") { string { "0.5" } }
     CORRADE_COMPARE(out.str(), "Trade::OpenGexImporter::openData(): invalid value for distance metric\n");
 }
 
+void OpenGexImporterTest::camera() {
+    OpenGexImporter importer;
+    CORRADE_VERIFY(importer.openFile(Utility::Directory::join(OPENGEXIMPORTER_TEST_DIR, "camera.ogex")));
+    CORRADE_COMPARE(importer.cameraCount(), 3);
+
+    /* Everything specified */
+    {
+        std::optional<Trade::CameraData> camera = importer.camera(0);
+        CORRADE_VERIFY(camera);
+        CORRADE_COMPARE(camera->fov(), 0.97_radf);
+        CORRADE_COMPARE(camera->near(), 1.5f);
+        CORRADE_COMPARE(camera->far(), 150.0f);
+    }
+
+    /* Nothing specified (defaults) */
+    {
+        std::optional<Trade::CameraData> camera = importer.camera(1);
+        CORRADE_VERIFY(camera);
+        CORRADE_COMPARE(camera->fov(), Rad{35.0_degf});
+        CORRADE_COMPARE(camera->near(), 0.01f);
+        CORRADE_COMPARE(camera->far(), 100.0f);
+    }
+
+    std::ostringstream out;
+    Error::setOutput(&out);
+    CORRADE_VERIFY(!importer.camera(2));
+    CORRADE_COMPARE(out.str(), "Trade::OpenGexImporter::camera(): invalid parameter\n");
+}
+
+void OpenGexImporterTest::cameraMetrics() {
+    OpenGexImporter importer;
+    CORRADE_VERIFY(importer.openFile(Utility::Directory::join(OPENGEXIMPORTER_TEST_DIR, "camera-metrics.ogex")));
+    CORRADE_COMPARE(importer.cameraCount(), 1);
+
+    std::optional<Trade::CameraData> camera = importer.camera(0);
+    CORRADE_VERIFY(camera);
+    CORRADE_COMPARE(camera->fov(), 0.97_radf);
+    CORRADE_COMPARE(camera->near(), 1.5f);
+    CORRADE_COMPARE(camera->far(), 150.0f);
+}
+
 void OpenGexImporterTest::object() {
     OpenGexImporter importer;
     CORRADE_VERIFY(importer.openFile(Utility::Directory::join(OPENGEXIMPORTER_TEST_DIR, "object.ogex")));
@@ -218,6 +268,24 @@ void OpenGexImporterTest::object() {
     CORRADE_VERIFY(lightObject);
     CORRADE_COMPARE(lightObject->instanceType(), Trade::ObjectInstanceType3D::Light);
     CORRADE_VERIFY(lightObject->children().empty());
+}
+
+void OpenGexImporterTest::objectCamera() {
+    OpenGexImporter importer;
+    CORRADE_VERIFY(importer.openFile(Utility::Directory::join(OPENGEXIMPORTER_TEST_DIR, "object-camera.ogex")));
+    CORRADE_COMPARE(importer.object3DCount(), 2);
+
+    {
+        std::unique_ptr<Trade::ObjectData3D> object = importer.object3D(0);
+        CORRADE_VERIFY(object);
+        CORRADE_COMPARE(object->instanceType(), Trade::ObjectInstanceType3D::Camera);
+        CORRADE_COMPARE(object->instance(), 1);
+    }
+
+    std::ostringstream out;
+    Error::setOutput(&out);
+    CORRADE_VERIFY(!importer.object3D(1));
+    CORRADE_COMPARE(out.str(), "Trade::OpenGexImporter::object3D(): null camera reference\n");
 }
 
 void OpenGexImporterTest::objectMesh() {

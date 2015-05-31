@@ -28,10 +28,11 @@
 #include <algorithm>
 #include <limits>
 #include <unordered_map>
-#include <Corrade/Containers/Array.h>
+#include <Corrade/Containers/ArrayView.h>
 #include <Corrade/Utility/Directory.h>
 #include <Magnum/Mesh.h>
 #include <Magnum/Math/Quaternion.h>
+#include <Magnum/Trade/CameraData.h>
 #include <Magnum/Trade/ImageData.h>
 #include <Magnum/Trade/MeshData3D.h>
 #include <Magnum/Trade/MeshObjectData3D.h>
@@ -55,13 +56,14 @@ struct OpenGexImporter::Document {
     /* GCC 4.6 doesn't have non-static data member initializers */
     explicit Document(): distanceMultiplier{1.0f}, angleMultiplier{1.0f}, timeMultiplier{1.0f}, yUp{false} {}
     Float distanceMultiplier;
-    Float angleMultiplier;
+    Rad angleMultiplier;
     Float timeMultiplier;
     bool yUp;
 
     std::optional<std::string> filePath;
 
     std::vector<OpenDdl::Structure> nodes,
+        cameras,
         meshes,
         materials,
         textures;
@@ -116,7 +118,7 @@ void gatherNodes(OpenDdl::Structure node, std::vector<OpenDdl::Structure>& nodes
 
 }
 
-void OpenGexImporter::doOpenData(const Containers::ArrayReference<const char> data) {
+void OpenGexImporter::doOpenData(const Containers::ArrayView<const char> data) {
     std::unique_ptr<Document> d{new Document};
 
     /* Parse the document */
@@ -146,7 +148,7 @@ void OpenGexImporter::doOpenData(const Containers::ArrayReference<const char> da
                 return;
             }
 
-            d->angleMultiplier = value.as<Float>();
+            d->angleMultiplier = Rad{value.as<Float>()};
 
         /* Time multiplier */
         } else if(key == "time") {
@@ -167,6 +169,10 @@ void OpenGexImporter::doOpenData(const Containers::ArrayReference<const char> da
             d->yUp = value.as<std::string>() == "y";
         }
     }
+
+    /* Gather all cameras */
+    for(const OpenDdl::Structure camera: d->document.childrenOf(OpenGex::CameraObject))
+        d->cameras.push_back(camera);
 
     /* Gather all meshes */
     /** @todo Support for LOD */
@@ -228,6 +234,35 @@ std::optional<SceneData> OpenGexImporter::doScene(UnsignedInt) {
     }
 
     return SceneData{{}, children};
+}
+
+UnsignedInt OpenGexImporter::doCameraCount() const {
+    return _d->cameras.size();
+}
+
+std::optional<CameraData> OpenGexImporter::doCamera(UnsignedInt id) {
+    const OpenDdl::Structure camera = _d->cameras[id];
+
+    Rad fov = Rad{Constants::nan()};
+    Float near = Constants::nan();
+    Float far = Constants::nan();
+    for(const OpenDdl::Structure param: camera.childrenOf(OpenGex::Param)) {
+        const OpenDdl::Structure data = param.firstChild();
+
+        const auto attrib = param.propertyOf(OpenGex::attrib);
+        if(attrib.as<std::string>() == "fov")
+            fov = data.as<Float>()*_d->angleMultiplier;
+        else if(attrib.as<std::string>() == "near")
+            near = data.as<Float>()*_d->distanceMultiplier;
+        else if(attrib.as<std::string>() == "far")
+            far = data.as<Float>()*_d->distanceMultiplier;
+        else {
+            Error() << "Trade::OpenGexImporter::camera(): invalid parameter";
+            return std::nullopt;
+        }
+    }
+
+    return CameraData{fov, near, far};
 }
 
 UnsignedInt OpenGexImporter::doObject3DCount() const {
@@ -324,17 +359,17 @@ std::unique_ptr<ObjectData3D> OpenGexImporter::doObject3D(const UnsignedInt id) 
             const auto kind = t.findPropertyOf(OpenGex::kind);
             /* GCC 4.6 doesn't like Rad{} */
             if((!kind || kind->as<std::string>() == "axis") && data.subArraySize() == 4) {
-                const auto angle = Rad(data.asArray<Float>()[0]*_d->angleMultiplier);
+                const auto angle = data.asArray<Float>()[0]*_d->angleMultiplier;
                 const auto axis = Vector3::from(data.asArray<Float>() + 1).normalized();
                 m = Matrix4::rotation(angle, axis);
             } else if(kind && kind->as<std::string>() == "x" && data.subArraySize() == 0) {
-                const auto angle = Rad(data.as<Float>()*_d->angleMultiplier);
+                const auto angle = data.as<Float>()*_d->angleMultiplier;
                 m = Matrix4::rotationX(angle);
             } else if(kind && kind->as<std::string>() == "y" && data.subArraySize() == 0) {
-                const auto angle = Rad(data.as<Float>()*_d->angleMultiplier);
+                const auto angle = data.as<Float>()*_d->angleMultiplier;
                 m = Matrix4::rotationY(angle);
             } else if(kind && kind->as<std::string>() == "z" && data.subArraySize() == 0) {
-                const auto angle = Rad(data.as<Float>()*_d->angleMultiplier);
+                const auto angle = data.as<Float>()*_d->angleMultiplier;
                 m = Matrix4::rotationZ(angle);
             } else if(kind && kind->as<std::string>() == "quaternion" && data.subArraySize() == 4) {
                 const auto vector = Vector3::from(data.asArray<Float>());
@@ -400,8 +435,15 @@ std::unique_ptr<ObjectData3D> OpenGexImporter::doObject3D(const UnsignedInt id) 
 
     /* Camera object */
     } else if(node.identifier() == OpenGex::CameraNode) {
-        /** @todo actually extract the ID when cameras are supported */
-        return std::unique_ptr<ObjectData3D>{new ObjectData3D{children, transformation, ObjectInstanceType3D::Camera, 0}};
+        /* Camera ID */
+        const auto camera = node.firstChildOf(OpenGex::ObjectRef).firstChildOf(OpenDdl::Type::Reference).asReference();
+        if(!camera) {
+            Error() << "Trade::OpenGexImporter::object3D(): null camera reference";
+            return nullptr;
+        }
+        const UnsignedInt cameraId = structureId(_d->cameras, *camera);
+
+        return std::unique_ptr<ObjectData3D>{new ObjectData3D{children, transformation, ObjectInstanceType3D::Camera, cameraId}};
 
     /* Light object */
     } else if(node.identifier() == OpenGex::LightNode) {
@@ -421,7 +463,7 @@ UnsignedInt OpenGexImporter::doMesh3DCount() const {
 namespace {
 
 template<class Result, class Original> std::vector<Result> extractVertexData3(const OpenDdl::Structure vertexArray) {
-    const Containers::ArrayReference<const typename Original::Type> data = vertexArray.asArray<typename Original::Type>();
+    const Containers::ArrayView<const typename Original::Type> data = vertexArray.asArray<typename Original::Type>();
     const std::size_t vertexCount = vertexArray.arraySize()/(vertexArray.subArraySize() ? vertexArray.subArraySize() : 1);
 
     std::vector<Result> output;
@@ -464,7 +506,7 @@ template<class Result> std::vector<Result> extractVertexData(const OpenDdl::Stru
 }
 
 template<class T> std::vector<UnsignedInt> extractIndices(const OpenDdl::Structure indexArray) {
-    const Containers::ArrayReference<const T> data = indexArray.asArray<T>();
+    const Containers::ArrayView<const T> data = indexArray.asArray<T>();
     return {data.begin(), data.end()};
 }
 

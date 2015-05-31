@@ -75,9 +75,10 @@ The images are imported with @ref ColorType::UnsignedByte type and
 grayscale or @ref ColorFormat::RG for grayscale + alpha. Grayscale and
 grayscale + alpha images require extension @extension{ARB,texture_rg}.
 
-In OpenGL ES 2.0, if @es_extension{EXT,texture_rg} is not supported, grayscale
-images use @ref ColorFormat::Luminance instead of @ref ColorFormat::Red and
-@ref ColorFormat::LuminanceAlpha instead of @ref ColorFormat::RG.
+In OpenGL ES 2.0 if @es_extension{EXT,texture_rg} is not supported and in WebGL
+1.0, grayscale images use @ref ColorFormat::Luminance instead of
+@ref ColorFormat::Red and @ref ColorFormat::LuminanceAlpha instead of
+@ref ColorFormat::RG.
 
 @todo Properly support floating-point HDR images
 @todo Enable ARM NEON when I'm able to test that
@@ -96,7 +97,7 @@ class StbImageImporter: public AbstractImporter {
         Features doFeatures() const override;
         bool doIsOpened() const override;
         void doClose() override;
-        void doOpenData(Containers::ArrayReference<const char> data) override;
+        void doOpenData(Containers::ArrayView<const char> data) override;
 
         UnsignedInt doImage2DCount() const override;
         std::optional<ImageData2D> doImage2D(UnsignedInt id) override;
