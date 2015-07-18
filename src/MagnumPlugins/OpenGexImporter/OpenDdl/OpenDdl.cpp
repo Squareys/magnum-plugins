@@ -1167,10 +1167,9 @@ std::optional<Structure> Property::asReference() const {
 namespace Validation {
 
 void Structure::initialize(Properties properties, Primitives primitives, Structures structures) {
-    /** @todo use NoInit and std::uninitialized_copy when done */
-    std::copy(properties.begin(), properties.end(), _properties.begin());
-    std::copy(primitives.begin(), primitives.end(), _primitives.begin());
-    std::copy(structures.begin(), structures.end(), _structures.begin());
+    std::uninitialized_copy(properties.begin(), properties.end(), _properties.begin());
+    std::uninitialized_copy(primitives.begin(), primitives.end(), _primitives.begin());
+    std::uninitialized_copy(structures.begin(), structures.end(), _structures.begin());
 }
 
 }

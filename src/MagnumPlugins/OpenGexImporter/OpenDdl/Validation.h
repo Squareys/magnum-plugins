@@ -96,11 +96,6 @@ class Property {
         #endif
 
     private:
-        /** @todo remove this ugly hack when we have Containers::Array(NoInit) */
-        /* GCC 4.6 needs the class keyword */
-        friend class Containers::Array<Property>;
-        constexpr explicit Property(): _identifier{-1}, _type{}, _required{} {}
-
         Int _identifier;
         PropertyType _type;
         bool _required;
@@ -171,28 +166,28 @@ class Structure {
          */
         /* GCC 4.6 doesn't have delegating constructors, also there's some
            problem with the default value */
-        /*implicit*/ Structure(Int identifier, Properties properties, Primitives primitives, std::size_t primitiveCount, std::size_t primitiveArraySize, Structures structures = Structures{}): _identifier{identifier}, _properties{properties.size()}, _primitives{primitives.size()}, _structures{structures.size()}, _primitiveCount{primitiveCount}, _primitiveArraySize{primitiveArraySize} {
+        /*implicit*/ Structure(Int identifier, Properties properties, Primitives primitives, std::size_t primitiveCount, std::size_t primitiveArraySize, Structures structures = Structures{}): _identifier{identifier}, _properties{Containers::NoInit, properties.size()}, _primitives{Containers::NoInit, primitives.size()}, _structures{Containers::NoInit, structures.size()}, _primitiveCount{primitiveCount}, _primitiveArraySize{primitiveArraySize} {
             initialize(properties, primitives, structures);
         }
 
         /** @overload */
         /* GCC 4.6 doesn't have delegating constructors, also there's some
            problem with the default value */
-        /*implicit*/ Structure(Int identifier, Primitives primitives, std::size_t primitiveCount, std::size_t primitiveArraySize, Structures structures = Structures{}): _identifier{identifier}, _primitives{primitives.size()}, _structures{structures.size()}, _primitiveCount{primitiveCount}, _primitiveArraySize{primitiveArraySize} {
+        /*implicit*/ Structure(Int identifier, Primitives primitives, std::size_t primitiveCount, std::size_t primitiveArraySize, Structures structures = Structures{}): _identifier{identifier}, _primitives{Containers::NoInit, primitives.size()}, _structures{Containers::NoInit, structures.size()}, _primitiveCount{primitiveCount}, _primitiveArraySize{primitiveArraySize} {
             initialize({}, primitives, structures);
         }
 
         /** @overload */
         /* GCC 4.6 doesn't have delegating constructors, also there's some
            problem with the default value */
-        /*implicit*/ Structure(Int identifier, Properties properties, Structures structures = Structures{}): _identifier{identifier}, _properties{properties.size()}, _structures{structures.size()}, _primitiveCount{}, _primitiveArraySize{} {
+        /*implicit*/ Structure(Int identifier, Properties properties, Structures structures = Structures{}): _identifier{identifier}, _properties{Containers::NoInit, properties.size()}, _structures{Containers::NoInit, structures.size()}, _primitiveCount{}, _primitiveArraySize{} {
             initialize(properties, {}, structures);
         }
 
         /** @overload */
         /* GCC 4.6 doesn't have delegating constructors, also there's some
            problem with the default value */
-        /*implicit*/ Structure(Int identifier, Structures structures = Structures{}): _identifier{identifier}, _structures{structures.size()}, _primitiveCount{}, _primitiveArraySize{} {
+        /*implicit*/ Structure(Int identifier, Structures structures = Structures{}): _identifier{identifier}, _structures{Containers::NoInit, structures.size()}, _primitiveCount{}, _primitiveArraySize{} {
             initialize({}, {}, structures);
         }
 
