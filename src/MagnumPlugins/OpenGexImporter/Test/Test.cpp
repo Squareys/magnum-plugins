@@ -226,7 +226,7 @@ void OpenGexImporterTest::cameraMetrics() {
 
     std::optional<Trade::CameraData> camera = importer.camera(0);
     CORRADE_VERIFY(camera);
-    CORRADE_COMPARE(camera->fov(), 0.97_radf);
+    CORRADE_COMPARE(camera->fov(), Rad{0.97f});
     CORRADE_COMPARE(camera->near(), 1.5f);
     CORRADE_COMPARE(camera->far(), 150.0f);
 }
