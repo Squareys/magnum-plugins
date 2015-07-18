@@ -199,7 +199,7 @@ void OpenGexImporterTest::camera() {
     {
         std::optional<Trade::CameraData> camera = importer.camera(0);
         CORRADE_VERIFY(camera);
-        CORRADE_COMPARE(camera->fov(), 0.97_radf);
+        CORRADE_COMPARE(camera->fov(), Rad{0.97f});
         CORRADE_COMPARE(camera->near(), 1.5f);
         CORRADE_COMPARE(camera->far(), 150.0f);
     }
@@ -208,7 +208,7 @@ void OpenGexImporterTest::camera() {
     {
         std::optional<Trade::CameraData> camera = importer.camera(1);
         CORRADE_VERIFY(camera);
-        CORRADE_COMPARE(camera->fov(), Rad{35.0_degf});
+        CORRADE_COMPARE(camera->fov(), Rad{Deg{35.0f}});
         CORRADE_COMPARE(camera->near(), 0.01f);
         CORRADE_COMPARE(camera->far(), 100.0f);
     }
