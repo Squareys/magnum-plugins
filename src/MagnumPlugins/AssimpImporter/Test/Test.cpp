@@ -185,6 +185,8 @@ void AssimpImporterTest::objectCamera() {
 }
 
 void AssimpImporterTest::objectLight() {
+    CORRADE_SKIP("assimp segfaults this test because of assimp/assimp#1262");
+
     AssimpImporter importer;
     CORRADE_VERIFY(importer.openFile(Utility::Directory::join(OPENGEXIMPORTER_TEST_DIR, "object-light.ogex")));
     CORRADE_COMPARE(importer.object3DCount(), 2);
@@ -263,6 +265,8 @@ void AssimpImporterTest::objectTransformation() {
 }
 
 void AssimpImporterTest::light() {
+    CORRADE_SKIP("assimp segfaults this test because of assimp/assimp#1262");
+
     AssimpImporter importer;
     CORRADE_VERIFY(importer.openFile(Utility::Directory::join(OPENGEXIMPORTER_TEST_DIR, "light.ogex")));
     CORRADE_COMPARE(importer.lightCount(), 3);
@@ -297,6 +301,7 @@ void AssimpImporterTest::mesh() {
     AssimpImporter importer;
     CORRADE_VERIFY(importer.openFile(Utility::Directory::join(OPENGEXIMPORTER_TEST_DIR, "mesh.ogex")));
 
+    CORRADE_COMPARE(1, importer.mesh3DCount());
     std::optional<Trade::MeshData3D> mesh = importer.mesh3D(0);
     CORRADE_VERIFY(mesh);
     CORRADE_COMPARE(mesh->primitive(), MeshPrimitive::TriangleStrip);
@@ -365,6 +370,7 @@ void AssimpImporterTest::materialTextured() {
 }
 
 void AssimpImporterTest::texture() {
+    CORRADE_SKIP("assimp segfaults this test because of assimp/assimp#1262");
     AssimpImporter importer;
 
     CORRADE_VERIFY(importer.openFile(Utility::Directory::join(OPENGEXIMPORTER_TEST_DIR, "texture.ogex")));
