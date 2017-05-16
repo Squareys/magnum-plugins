@@ -1,7 +1,7 @@
 /*
     This file is part of Magnum.
 
-    Copyright © 2010, 2011, 2012, 2013, 2014, 2015, 2016
+    Copyright © 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017
               Vladimír Vondruš <mosra@centrum.cz>
     Copyright © 2017 Jonathan Hale <squareys@googlemail.com>
 
@@ -79,13 +79,13 @@ auto AssimpImporter::doFeatures() const -> Features { return Feature::OpenData; 
 bool AssimpImporter::doIsOpened() const { return !!_scene; }
 
 void AssimpImporter::doOpenData(const Containers::ArrayView<const char> data) {
-    _scene = _importer.ReadFileFromMemory(data.data(), data.size(), aiProcess_MakeLeftHanded | aiProcess_CalcTangentSpace | aiProcess_Triangulate | aiProcess_JoinIdenticalVertices | aiProcess_SortByPType);
+    _scene = _importer.ReadFileFromMemory(data.data(), data.size(), aiProcess_CalcTangentSpace | aiProcess_Triangulate | aiProcess_JoinIdenticalVertices | aiProcess_SortByPType);
 
     createNodeIndices();
 }
 
 void AssimpImporter::doOpenFile(const std::string& filename) {
-    _scene = _importer.ReadFile(filename, aiProcess_MakeLeftHanded | aiProcess_CalcTangentSpace | aiProcess_Triangulate | aiProcess_JoinIdenticalVertices | aiProcess_SortByPType);
+    _scene = _importer.ReadFile(filename, aiProcess_CalcTangentSpace | aiProcess_Triangulate | aiProcess_JoinIdenticalVertices | aiProcess_SortByPType);
 
     createNodeIndices();
 }
@@ -349,7 +349,7 @@ const void* AssimpImporter::doImporterState() const {
 }
 
 void AssimpImporter::createNodeIndices() {
-    if(_nodes.empty()) {
+    if(!_nodes.empty()) {
         /* Already done previously */
         return;
     }
