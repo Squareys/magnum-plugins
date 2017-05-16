@@ -14,6 +14,7 @@ addons:
     - libpng12-dev
     - libqt4-dev
     - libdevil-dev
+    - libassimp-dev
 
 matrix:
   include:
