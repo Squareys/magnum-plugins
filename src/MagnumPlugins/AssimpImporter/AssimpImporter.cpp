@@ -349,6 +349,10 @@ const void* AssimpImporter::doImporterState() const {
 }
 
 void AssimpImporter::createNodeIndices() {
+    if(!_scene) {
+        /* Scene was not imported correctly by assimp */
+        return;
+    }
     if(!_nodes.empty()) {
         /* Already done previously */
         return;
@@ -356,6 +360,9 @@ void AssimpImporter::createNodeIndices() {
 
     /* reserve memory for the amount of nodes we know will at least be present */
     aiNode* root = _scene->mRootNode;
+    if(!root) {
+        return; /* Nothing to do */    
+    }
     _nodes.reserve(root->mNumChildren+1); /* Children + root itself */
     _nodes.push_back(root);
 
