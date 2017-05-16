@@ -60,8 +60,8 @@ if(WIN32)
     find_library(ASSIMP_LIBRARY_RELEASE assimp-${ASSIMP_MSVC_VERSION}-mt.lib PATHS ${ASSIMP_LIBRARY_DIR})
     find_library(ASSIMP_LIBRARY_DEBUG assimp-${ASSIMP_MSVC_VERSION}-mtd.lib PATHS ${ASSIMP_LIBRARY_DIR})
 else()
-    find_library(ASSIMP_LIBRARY_RELEASE assimp PATHS lib)
-    find_library(ASSIMP_LIBRARY_DEBUG assimpd PATHS lib)
+    find_library(ASSIMP_LIBRARY_RELEASE libassimp PATHS lib)
+    find_library(ASSIMP_LIBRARY_DEBUG libassimpd PATHS lib)
 endif()
 
 include(SelectLibraryConfigurations)
@@ -76,9 +76,14 @@ find_package_handle_standard_args(Assimp DEFAULT_MSG
 if(NOT TARGET Assimp::Assimp)
     add_library(Assimp::Assimp UNKNOWN IMPORTED)
 
-    set_target_properties(Assimp::Assimp PROPERTIES
-        IMPORTED_LOCATION_DEBUG ${ASSIMP_LIBRARY_DEBUG}
-        IMPORTED_LOCATION_RELEASE ${ASSIMP_LIBRARY_RELEASE})
+    if(ASSIMP_LIBRARY_DEBUG AND ASSIMP_LIBRARY_RELEASE)
+        set_target_properties(Assimp::Assimp PROPERTIES
+            IMPORTED_LOCATION_DEBUG ${ASSIMP_LIBRARY_DEBUG}
+            IMPORTED_LOCATION_RELEASE ${ASSIMP_LIBRARY_RELEASE})
+    else()
+        set_target_properties(Assimp::Assimp PROPERTIES
+            IMPORTED_LOCATION ${ASSIMP_LIBRARY_DEBUG} ${ASSIMP_LIBRARY_RELEASE})
+    endif()
 
     set_target_properties(Assimp::Assimp PROPERTIES
         INTERFACE_INCLUDE_DIRECTORIES ${ASSIMP_INCLUDE_DIR})
