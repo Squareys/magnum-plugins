@@ -17,7 +17,7 @@
 #
 #   This file is part of Magnum.
 #
-#   Copyright © 2010, 2011, 2012, 2013, 2014, 2015, 2016
+#   Copyright © 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017
 #             Vladimír Vondruš <mosra@centrum.cz>
 #   Copyright © 2017 Jonathan Hale <squareys@googlemail.com>
 #
@@ -55,14 +55,13 @@ if(WIN32)
         set(ASSIMP_LIBRARY_DIR "lib64")
     elseif(CMAKE_SIZEOF_VOID_P EQUAL 4)
         set(ASSIMP_LIBRARY_DIR "lib32")
-    endif(CMAKE_SIZEOF_VOID_P EQUAL 8)
+    endif()
 
     find_library(ASSIMP_LIBRARY_RELEASE assimp-${ASSIMP_MSVC_VERSION}-mt.lib PATHS ${ASSIMP_LIBRARY_DIR})
     find_library(ASSIMP_LIBRARY_DEBUG assimp-${ASSIMP_MSVC_VERSION}-mtd.lib PATHS ${ASSIMP_LIBRARY_DIR})
-    set(ASSIMP_LIBRARY optimized ${ASSIMP_LIBRARY_RELEASE} debug ${ASSIMP_LIBRARY_DEBUG})
-
 else()
-    find_library(ASSIMP_LIBRARY NAMES assimp PATHS lib)
+    find_library(ASSIMP_LIBRARY_RELEASE assimp PATHS lib)
+    find_library(ASSIMP_LIBRARY_DEBUG assimpd PATHS lib)
 endif()
 
 include(SelectLibraryConfigurations)
@@ -70,20 +69,16 @@ select_library_configurations(Assimp)
 
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(Assimp DEFAULT_MSG
-    ASSIMP_LIBRARY
+    ASSIMP_LIBRARY_DEBUG
+    ASSIMP_LIBRARY_RELEASE
     ASSIMP_INCLUDE_DIR)
 
 if(NOT TARGET Assimp::Assimp)
     add_library(Assimp::Assimp UNKNOWN IMPORTED)
 
-    if(ASSIMP_LIBRARY_DEBUG AND ASSIMP_LIBRARY_RELEASE)
-        set_target_properties(Assimp::Assimp PROPERTIES
-            IMPORTED_LOCATION_DEBUG ${ASSIMP_LIBRARY_DEBUG}
-            IMPORTED_LOCATION_RELEASE ${ASSIMP_LIBRARY_RELEASE})
-    else()
-        set_target_properties(Assimp::Assimp PROPERTIES
-            IMPORTED_LOCATION ${ASSIMP_LIBRARY})
-    endif()
+    set_target_properties(Assimp::Assimp PROPERTIES
+        IMPORTED_LOCATION_DEBUG ${ASSIMP_LIBRARY_DEBUG}
+        IMPORTED_LOCATION_RELEASE ${ASSIMP_LIBRARY_RELEASE})
 
     set_target_properties(Assimp::Assimp PROPERTIES
         INTERFACE_INCLUDE_DIRECTORIES ${ASSIMP_INCLUDE_DIR})
