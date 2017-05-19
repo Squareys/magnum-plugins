@@ -1,3 +1,5 @@
+#include <assimp/Logger.hpp>
+#include <../../assimp/include/assimp/Logger.hpp>
 /*
     This file is part of Magnum.
 
@@ -44,67 +46,144 @@
 
 #include <MagnumPlugins/AssimpImporter/AssimpImporter.h>
 
+#include <assimp/Logger.hpp>
+#include <assimp/DefaultLogger.hpp>
+
 #include "configure.h"
 
 namespace Magnum { namespace Trade { namespace Test {
 
 using namespace Magnum::Math::Literals;
 
+/* Stream implementation for outputting assimp log messages to Debug() */
+class MagnumDebugStream: public Assimp::LogStream {
+public:
+    void write(const char* message) override {
+        Debug(Debug::Flag::NoNewlineAtTheEnd) << Debug::color(Debug::Color::Yellow) << "assimp:" << message;
+    }
+};
+
 struct AssimpImporterTest: public TestSuite::Tester {
     explicit AssimpImporterTest();
 
     void open();
 
-    void camera();
+    void colladaScene();
 
-    void object();
-    void objectCamera();
-    void objectLight();
-    void objectMesh();
-    void objectTransformation();
+    void ogexCamera();
 
-    void light();
+    void ogexObject();
+    void ogexObjectCamera();
+    void ogexObjectLight();
+    void ogexObjectMesh();
+    void ogexObjectTransformation();
 
-    void mesh();
+    void ogexLight();
 
-    void materialColors();
-    void materialTextured();
+    void ogexMesh();
 
-    void texture();
+    void ogexMaterialColors();
+    void ogexMaterialTextured();
 
-    void image();
+    void ogexTexture();
+
+    void ogexImage();
 };
 
 AssimpImporterTest::AssimpImporterTest() {
+    Assimp::DefaultLogger::create("", Assimp::Logger::VERBOSE);
+    Assimp::DefaultLogger::get()->attachStream(new MagnumDebugStream,
+            Assimp::Logger::Info|Assimp::Logger::Err|Assimp::Logger::Warn|Assimp::Logger::Debugging);
+
     addTests({&AssimpImporterTest::open,
 
-              &AssimpImporterTest::camera,
+              &AssimpImporterTest::colladaScene,
 
-              &AssimpImporterTest::object,
-              &AssimpImporterTest::objectCamera,
-              &AssimpImporterTest::objectLight,
-              &AssimpImporterTest::objectMesh,
-              &AssimpImporterTest::objectTransformation,
+              &AssimpImporterTest::ogexCamera,
 
-              &AssimpImporterTest::light,
+              &AssimpImporterTest::ogexObject,
+              &AssimpImporterTest::ogexObjectCamera,
+              &AssimpImporterTest::ogexObjectLight,
+              &AssimpImporterTest::ogexObjectMesh,
+              &AssimpImporterTest::ogexObjectTransformation,
 
-              &AssimpImporterTest::mesh,
+              &AssimpImporterTest::ogexLight,
 
-              &AssimpImporterTest::materialColors,
-              &AssimpImporterTest::materialTextured,
+              &AssimpImporterTest::ogexMesh,
 
-              &AssimpImporterTest::texture,
+              &AssimpImporterTest::ogexMaterialColors,
+              &AssimpImporterTest::ogexMaterialTextured,
 
-              &AssimpImporterTest::image});
+              &AssimpImporterTest::ogexTexture,
+
+              &AssimpImporterTest::ogexImage});
 }
 
 void AssimpImporterTest::open() {
+    CORRADE_SKIP("Don't know what to do here yet.");
     AssimpImporter importer;
 
     // TODO
 }
 
-void AssimpImporterTest::camera() {
+void AssimpImporterTest::colladaScene() {
+    AssimpImporter importer;
+    CORRADE_VERIFY(importer.openFile(Utility::Directory::join(COLLADAIMPORTER_TEST_DIR, "scene.dae")));
+
+    CORRADE_COMPARE(importer.defaultScene(), 1);
+    CORRADE_COMPARE(importer.sceneCount(), 2);
+    CORRADE_COMPARE(importer.object3DCount(), 6);
+
+    CORRADE_COMPARE(importer.sceneName(1), "Scene2");
+    CORRADE_COMPARE(importer.sceneForName("Scene2"), 1);
+
+    CORRADE_COMPARE(importer.sceneName(0), "Scene");
+    CORRADE_COMPARE(importer.sceneForName("Scene"), 0);
+    std::optional<SceneData> scene = importer.scene(0);
+    CORRADE_VERIFY(scene);
+    CORRADE_COMPARE(scene->children3D(), (std::vector<UnsignedInt>{0, 2}));
+
+    CORRADE_COMPARE(importer.object3DName(0), "Camera");
+    CORRADE_COMPARE(importer.object3DForName("Camera"), 0);
+    std::unique_ptr<ObjectData3D> object = importer.object3D(0);
+    CORRADE_VERIFY(object);
+    CORRADE_COMPARE(object->instanceType(), ObjectInstanceType3D::Camera);
+    CORRADE_COMPARE(object->instance(), 2);
+    CORRADE_COMPARE(object->children(), std::vector<UnsignedInt>{1});
+
+    CORRADE_COMPARE(importer.object3DName(1), "Light");
+    CORRADE_COMPARE(importer.object3DForName("Light"), 1);
+    object = importer.object3D(1);
+    CORRADE_VERIFY(object);
+    CORRADE_COMPARE(object->instanceType(), ObjectInstanceType3D::Light);
+    CORRADE_COMPARE(object->instance(), 1);
+    CORRADE_VERIFY(object->children().empty());
+
+    CORRADE_COMPARE(importer.object3DName(2), "Mesh");
+    CORRADE_COMPARE(importer.object3DForName("Mesh"), 2);
+    object = importer.object3D(2);
+    CORRADE_VERIFY(object);
+    CORRADE_COMPARE(object->instanceType(), ObjectInstanceType3D::Mesh);
+    CORRADE_COMPARE(object->instance(), 2);
+    Matrix4 transformation =
+        Matrix4::translation({1, 2, 3})*
+        Matrix4::rotationZ(Deg(60.0f))*
+        Matrix4::rotationY(Deg(90.0f))*
+        Matrix4::rotationX(Deg(120.0f))*
+        Matrix4::scaling({3, 4, 5});
+    CORRADE_COMPARE(object->transformation(), transformation);
+    CORRADE_COMPARE(static_cast<MeshObjectData3D*>(object.get())->material(), 1);
+
+    std::ostringstream debug;
+    Error redirectError{&debug};
+    CORRADE_VERIFY(!importer.object3D(3));
+    CORRADE_VERIFY(!importer.object3D(4));
+    CORRADE_VERIFY(!importer.object3D(5));
+    CORRADE_COMPARE(debug.str(), "Trade::ColladaImporter::object3D(): \"instance_wrong\" instance type not supported\n"
+                                 "Trade::ColladaImporter::object3D(): mesh \"NonexistentMesh\" was not found\n"
+                                 "Trade::ColladaImporter::object3D(): material \"NonexistentMaterial\" was not found\n");
+}
+void AssimpImporterTest::ogexCamera() {
     AssimpImporter importer;
     CORRADE_VERIFY(importer.openFile(Utility::Directory::join(OPENGEXIMPORTER_TEST_DIR, "camera.ogex")));
     CORRADE_COMPARE(importer.cameraCount(), 2);
@@ -127,7 +206,7 @@ void AssimpImporterTest::camera() {
     }
 }
 
-void AssimpImporterTest::object() {
+void AssimpImporterTest::ogexObject() {
     AssimpImporter importer;
     CORRADE_VERIFY(importer.openFile(Utility::Directory::join(OPENGEXIMPORTER_TEST_DIR, "object.ogex")));
     CORRADE_COMPARE(importer.sceneCount(), 1);
@@ -166,7 +245,7 @@ void AssimpImporterTest::object() {
     CORRADE_VERIFY(lightObject->children().empty());
 }
 
-void AssimpImporterTest::objectCamera() {
+void AssimpImporterTest::ogexObjectCamera() {
     AssimpImporter importer;
     CORRADE_VERIFY(importer.openFile(Utility::Directory::join(OPENGEXIMPORTER_TEST_DIR, "object-camera.ogex")));
     CORRADE_COMPARE(importer.object3DCount(), 2);
@@ -184,7 +263,7 @@ void AssimpImporterTest::objectCamera() {
     CORRADE_COMPARE(out.str(), "Trade::AssimpImporter::object3D(): null camera reference\n");
 }
 
-void AssimpImporterTest::objectLight() {
+void AssimpImporterTest::ogexObjectLight() {
     CORRADE_SKIP("assimp segfaults this test because of assimp/assimp#1262");
 
     AssimpImporter importer;
@@ -204,7 +283,7 @@ void AssimpImporterTest::objectLight() {
     CORRADE_COMPARE(out.str(), "Trade::AssimpImporter::object3D(): null light reference\n");
 }
 
-void AssimpImporterTest::objectMesh() {
+void AssimpImporterTest::ogexObjectMesh() {
     AssimpImporter importer;
     CORRADE_VERIFY(importer.openFile(Utility::Directory::join(OPENGEXIMPORTER_TEST_DIR, "object-geometry.ogex")));
     CORRADE_COMPARE(importer.object3DCount(), 4);
@@ -239,7 +318,7 @@ void AssimpImporterTest::objectMesh() {
     CORRADE_COMPARE(out.str(), "Trade::AssimpImporter::object3D(): null geometry reference\n");
 }
 
-void AssimpImporterTest::objectTransformation() {
+void AssimpImporterTest::ogexObjectTransformation() {
     AssimpImporter importer;
     CORRADE_VERIFY(importer.openFile(Utility::Directory::join(OPENGEXIMPORTER_TEST_DIR, "object-transformation.ogex")));
     CORRADE_COMPARE(importer.object3DCount(), 3);
@@ -264,7 +343,7 @@ void AssimpImporterTest::objectTransformation() {
         "Trade::AssimpImporter::object3D(): unsupported object-only transformation\n");
 }
 
-void AssimpImporterTest::light() {
+void AssimpImporterTest::ogexLight() {
     CORRADE_SKIP("assimp segfaults this test because of assimp/assimp#1262");
 
     AssimpImporter importer;
@@ -297,7 +376,7 @@ void AssimpImporterTest::light() {
     }
 }
 
-void AssimpImporterTest::mesh() {
+void AssimpImporterTest::ogexMesh() {
     AssimpImporter importer;
     CORRADE_VERIFY(importer.openFile(Utility::Directory::join(OPENGEXIMPORTER_TEST_DIR, "mesh.ogex")));
 
@@ -323,7 +402,7 @@ void AssimpImporterTest::mesh() {
     }));
 }
 
-void AssimpImporterTest::materialColors() {
+void AssimpImporterTest::ogexMaterialColors() {
     AssimpImporter importer;
 
     CORRADE_VERIFY(importer.openFile(Utility::Directory::join(OPENGEXIMPORTER_TEST_DIR, "material.ogex")));
@@ -342,7 +421,7 @@ void AssimpImporterTest::materialColors() {
     CORRADE_COMPARE(phong.shininess(), 80.0f);
 }
 
-void AssimpImporterTest::materialTextured() {
+void AssimpImporterTest::ogexMaterialTextured() {
     AssimpImporter importer;
 
     CORRADE_VERIFY(importer.openFile(Utility::Directory::join(OPENGEXIMPORTER_TEST_DIR, "material.ogex")));
@@ -369,7 +448,7 @@ void AssimpImporterTest::materialTextured() {
     }
 }
 
-void AssimpImporterTest::texture() {
+void AssimpImporterTest::ogexTexture() {
     CORRADE_SKIP("assimp segfaults this test because of assimp/assimp#1262");
     AssimpImporter importer;
 
@@ -384,7 +463,7 @@ void AssimpImporterTest::texture() {
     CORRADE_COMPARE(texture->image(), 1);
 }
 
-void AssimpImporterTest::image() {
+void AssimpImporterTest::ogexImage() {
     PluginManager::Manager<AbstractImporter> manager{MAGNUM_PLUGINS_IMPORTER_DIR};
 
     if(manager.loadState("TgaImporter") == PluginManager::LoadState::NotFound)

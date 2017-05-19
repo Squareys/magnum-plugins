@@ -1,7 +1,7 @@
 #
 #   This file is part of Magnum.
 #
-#   Copyright © 2010, 2011, 2012, 2013, 2014, 2015, 2016
+#   Copyright © 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017
 #             Vladimír Vondruš <mosra@centrum.cz>
 #
 #   Permission is hereby granted, free of charge, to any person obtaining a
@@ -25,8 +25,10 @@
 
 if(CORRADE_TARGET_EMSCRIPTEN OR CORRADE_TARGET_ANDROID)
     set(OPENGEXIMPORTER_TEST_DIR "../../OpenGexImporter/Test/")
+    set(COLLADAIMPORTER_TEST_DIR "../../ColladaImporter/Test/ColladaImporterTestFiles")
 else()
     set(OPENGEXIMPORTER_TEST_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../OpenGexImporter/Test/")
+    set(COLLADAIMPORTER_TEST_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../ColladaImporter/Test/ColladaImporterTestFiles")
 endif()
 
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/configure.h.cmake
