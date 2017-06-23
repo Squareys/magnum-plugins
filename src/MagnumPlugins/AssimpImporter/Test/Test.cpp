@@ -264,8 +264,6 @@ void AssimpImporterTest::ogexObjectCamera() {
 }
 
 void AssimpImporterTest::ogexObjectLight() {
-    CORRADE_SKIP("assimp segfaults this test because of assimp/assimp#1262");
-
     AssimpImporter importer;
     CORRADE_VERIFY(importer.openFile(Utility::Directory::join(OPENGEXIMPORTER_TEST_DIR, "object-light.ogex")));
     CORRADE_COMPARE(importer.object3DCount(), 2);
@@ -344,8 +342,6 @@ void AssimpImporterTest::ogexObjectTransformation() {
 }
 
 void AssimpImporterTest::ogexLight() {
-    CORRADE_SKIP("assimp segfaults this test because of assimp/assimp#1262");
-
     AssimpImporter importer;
     CORRADE_VERIFY(importer.openFile(Utility::Directory::join(OPENGEXIMPORTER_TEST_DIR, "light.ogex")));
     CORRADE_COMPARE(importer.lightCount(), 3);
@@ -380,7 +376,7 @@ void AssimpImporterTest::ogexMesh() {
     AssimpImporter importer;
     CORRADE_VERIFY(importer.openFile(Utility::Directory::join(OPENGEXIMPORTER_TEST_DIR, "mesh.ogex")));
 
-    CORRADE_COMPARE(1, importer.mesh3DCount());
+    CORRADE_COMPARE( importer.mesh3DCount(), 1);
     std::optional<Trade::MeshData3D> mesh = importer.mesh3D(0);
     CORRADE_VERIFY(mesh);
     CORRADE_COMPARE(mesh->primitive(), MeshPrimitive::TriangleStrip);
@@ -449,7 +445,7 @@ void AssimpImporterTest::ogexMaterialTextured() {
 }
 
 void AssimpImporterTest::ogexTexture() {
-    CORRADE_SKIP("assimp segfaults this test because of assimp/assimp#1262");
+    CORRADE_SKIP("Fails because of unsupported texture parameter.");
     AssimpImporter importer;
 
     CORRADE_VERIFY(importer.openFile(Utility::Directory::join(OPENGEXIMPORTER_TEST_DIR, "texture.ogex")));
@@ -464,6 +460,7 @@ void AssimpImporterTest::ogexTexture() {
 }
 
 void AssimpImporterTest::ogexImage() {
+    CORRADE_SKIP("Fails because of unsupported texture parameter.");
     PluginManager::Manager<AbstractImporter> manager{MAGNUM_PLUGINS_IMPORTER_DIR};
 
     if(manager.loadState("TgaImporter") == PluginManager::LoadState::NotFound)
