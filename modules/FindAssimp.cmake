@@ -40,7 +40,16 @@
 #   DEALINGS IN THE SOFTWARE.
 #
 
-find_path(ASSIMP_INCLUDE_DIR NAMES assimp/anim.h HINTS include)
+if(APPLE)
+  # look in the brew directory
+  find_path(
+    ASSIMP_INCLUDE_DIR
+    NAMES assimp/anim.h
+    PATHS /usr/local/include/
+    )
+else()
+  find_path(ASSIMP_INCLUDE_DIR NAMES assimp/anim.h HINTS include)
+endif()
 
 if(WIN32)
     if(MSVC12)
@@ -57,9 +66,25 @@ if(WIN32)
         set(ASSIMP_LIBRARY_DIR "lib32")
     endif()
 
-    find_library(ASSIMP_LIBRARY_RELEASE assimp-${ASSIMP_MSVC_VERSION}-mt.lib PATHS ${ASSIMP_LIBRARY_DIR})
-    find_library(ASSIMP_LIBRARY_DEBUG assimp-${ASSIMP_MSVC_VERSION}-mtd.lib PATHS ${ASSIMP_LIBRARY_DIR})
+    find_library(ASSIMP_LIBRARY_RELEASE
+      assimp-${ASSIMP_MSVC_VERSION}-mt.lib
+      PATHS ${ASSIMP_LIBRARY_DIR})
+    
+    find_library(ASSIMP_LIBRARY_DEBUG
+      assimp-${ASSIMP_MSVC_VERSION}-mtd.lib
+      PATHS ${ASSIMP_LIBRARY_DIR})
+elseif(APPLE)
+    # look for brew's assimp, always get a release build here
+    find_library(
+      ASSIMP_LIBRARY
+      NAMES assimp
+      PATHS /usr/local/lib/
+      )
+
+    set(ASSIMP_LIBRARY_DEBUG ${ASSIMP_LIBRARY})
+    set(ASSIMP_LIBRARY_RELEASE ${ASSIMP_LIBRARY})
 else()
+    
     find_library(ASSIMP_LIBRARY_RELEASE libassimp PATHS lib)
     find_library(ASSIMP_LIBRARY_DEBUG libassimpd PATHS lib)
 endif()
@@ -90,3 +115,5 @@ if(NOT TARGET Assimp::Assimp)
 endif()
 
 set(ASSIMP_LIBRARIES ${ASSIMP_LIBRARY})
+
+set(Assimp_FOUND YES)
