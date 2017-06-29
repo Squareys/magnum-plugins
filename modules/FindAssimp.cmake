@@ -83,6 +83,10 @@ elseif(APPLE)
 
     set(ASSIMP_LIBRARY_DEBUG ${ASSIMP_LIBRARY})
     set(ASSIMP_LIBRARY_RELEASE ${ASSIMP_LIBRARY})
+
+    message("ASSIMP_LIBRARY_DEBUG: ${ASSIMP_LIBRARY_DEBUG}")
+    message("ASSIMP_LIBRARY_RELEASE: ${ASSIMP_LIBRARY_RELEASE}")
+
 else()
     
     find_library(ASSIMP_LIBRARY_RELEASE libassimp PATHS lib)
@@ -92,28 +96,36 @@ endif()
 include(SelectLibraryConfigurations)
 select_library_configurations(Assimp)
 
+# first look for the the paths, if we find them, find_package_handle_standard_args
+# sets Assimp_FOUND
+
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(Assimp DEFAULT_MSG
     ASSIMP_LIBRARY_DEBUG
     ASSIMP_LIBRARY_RELEASE
     ASSIMP_INCLUDE_DIR)
-
-if(NOT TARGET Assimp::Assimp)
+  
+# make the targets if we found Assimp
+if(Assimp_FOUND AND NOT TARGET Assimp::Assimp)
     add_library(Assimp::Assimp UNKNOWN IMPORTED)
 
-    if(ASSIMP_LIBRARY_DEBUG AND ASSIMP_LIBRARY_RELEASE)
-        set_target_properties(Assimp::Assimp PROPERTIES
-            IMPORTED_LOCATION_DEBUG ${ASSIMP_LIBRARY_DEBUG}
-            IMPORTED_LOCATION_RELEASE ${ASSIMP_LIBRARY_RELEASE})
+    # not sure why, but separate IMPORTED_LOCATION_DEBUG and RELEASSE
+    # don't work right at least on Unixes when statically linking plugins,
+    # on Unixes, juse use a single IMPORTED_LOCATION
+    if(WIN32)
+      set_target_properties(Assimp::Assimp PROPERTIES
+	IMPORTED_LOCATION_DEBUG ${ASSIMP_LIBRARY_DEBUG}
+	IMPORTED_LOCATION_RELEASE ${ASSIMP_LIBRARY_RELEASE})
     else()
-        set_target_properties(Assimp::Assimp PROPERTIES
-            IMPORTED_LOCATION ${ASSIMP_LIBRARY_DEBUG} ${ASSIMP_LIBRARY_RELEASE})
+    set_target_properties(Assimp::Assimp PROPERTIES
+      IMPORTED_LOCATION ${ASSIMP_LIBRARY})
     endif()
 
     set_target_properties(Assimp::Assimp PROPERTIES
-        INTERFACE_INCLUDE_DIRECTORIES ${ASSIMP_INCLUDE_DIR})
+      INTERFACE_INCLUDE_DIRECTORIES ${ASSIMP_INCLUDE_DIR})
+
+    set(ASSIMP_LIBRARIES ${ASSIMP_LIBRARY})
 endif()
 
-set(ASSIMP_LIBRARIES ${ASSIMP_LIBRARY})
 
-set(Assimp_FOUND YES)
+
