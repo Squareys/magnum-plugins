@@ -42,13 +42,20 @@ set(AssimpImporter_HEADERS
 
 # Objects shared between plugin and test library
 add_library(AssimpImporterObjects OBJECT
-    ${AssimpImporter_SRCS}
-    ${AssimpImporter_HEADERS})
+  ${AssimpImporter_SRCS}
+  ${AssimpImporter_HEADERS})
+
+# Need to set the include path for OBJECT libraries explicitly.
+# CMake does not allow OBJECT libraries to link to other libraries
+# and pick up transitive include paths. 
 target_include_directories(AssimpImporterObjects PUBLIC
-    $<TARGET_PROPERTY:Magnum::Magnum,INTERFACE_INCLUDE_DIRECTORIES>
-    ${PROJECT_SOURCE_DIR}/src
-    ${PROJECT_BINARY_DIR}/src)
+  $<TARGET_PROPERTY:Magnum::Magnum,INTERFACE_INCLUDE_DIRECTORIES>
+  $<TARGET_PROPERTY:Assimp::Assimp,INTERFACE_INCLUDE_DIRECTORIES>
+  ${PROJECT_SOURCE_DIR}/src
+  ${PROJECT_BINARY_DIR}/src)
+
 target_compile_definitions(AssimpImporterObjects PRIVATE "AssimpImporterObjects_EXPORTS")
+
 if(NOT BUILD_STATIC OR BUILD_STATIC_PIC)
     set_target_properties(AssimpImporterObjects PROPERTIES POSITION_INDEPENDENT_CODE ON)
 endif()
