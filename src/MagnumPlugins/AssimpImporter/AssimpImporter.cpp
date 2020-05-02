@@ -756,6 +756,8 @@ Containers::Pointer<AbstractMaterialData> AssimpImporter::doMaterial(const Unsig
     mat->Get(AI_MATKEY_SHININESS, shininess);
 
     UnsignedInt firstTextureIndex = _f->textureIndices[mat];
+    AI_MATKEY_TEXTURE
+    mat->GetNumUVChannels();
 
     /* Key always present, default black, except if Assimp has a bug (see
        below). And also the alpha is always set to zero, even if the source has
@@ -763,9 +765,10 @@ Containers::Pointer<AbstractMaterialData> AssimpImporter::doMaterial(const Unsig
     aiColor3D ambientColor;
     UnsignedInt ambientTexture{};
     mat->Get(AI_MATKEY_COLOR_AMBIENT, ambientColor);
-    if(flags & PhongMaterialData::Flag::AmbientTexture)
+    if(flags & PhongMaterialData::Flag::AmbientTexture) {
         ambientTexture = firstTextureIndex++;
-    else {
+        mat->Get(AI_MATKEY_UVWSRC(aiTextureType_AMBIENT, 0), ambientTextureLayer);
+    } else {
         /* Assimp 4.1 forces ambient color to white for STL models. That's just
            plain wrong, so we force it back to black (and emit a warning, so in
            the very rare case when someone would actually want white ambient,
@@ -780,25 +783,35 @@ Containers::Pointer<AbstractMaterialData> AssimpImporter::doMaterial(const Unsig
     /* Key always present, default black */
     aiColor4D diffuseColor;
     UnsignedInt diffuseTexture{};
+    UnsignedInt diffuseTextureLayer{};
     mat->Get(AI_MATKEY_COLOR_DIFFUSE, diffuseColor);
-    if(flags & PhongMaterialData::Flag::DiffuseTexture)
+    if(flags & PhongMaterialData::Flag::DiffuseTexture) {
         diffuseTexture = firstTextureIndex++;
+        mat->Get(AI_MATKEY_UVWSRC(aiTextureType_DIFFUSE, 0), diffuseTextureLayer);
+    }
 
     /* Key always present, default black */
     aiColor4D specularColor;
     UnsignedInt specularTexture{};
+    UnsignedInt specularTextureLayer{};
     mat->Get(AI_MATKEY_COLOR_SPECULAR, specularColor);
-    if(flags & PhongMaterialData::Flag::SpecularTexture)
+    if(flags & PhongMaterialData::Flag::SpecularTexture) {
         specularTexture = firstTextureIndex++;
+        mat->Get(AI_MATKEY_UVWSRC(aiTextureType_SPECULAR, 0), specularTextureLayer);
+    }
 
     UnsignedInt normalTexture{};
-    if(flags & PhongMaterialData::Flag::NormalTexture)
+    UnsignedInt normalTextureLayer{};
+    if(flags & PhongMaterialData::Flag::NormalTexture) {
         normalTexture = firstTextureIndex++;
+        mat->Get(AI_MATKEY_UVWSRC(aiTextureType_NORMALS, 0), normalTextureLayer);
+    }
 
     Containers::Pointer<PhongMaterialData> data{Containers::InPlaceInit, flags,
-        Color3{ambientColor}, ambientTexture,
-        Color4{diffuseColor}, diffuseTexture,
-        Color4{specularColor}, specularTexture, normalTexture, Matrix3{},
+        Color3{ambientColor}, ambientTexture, ambientTextureLayer,
+        Color4{diffuseColor}, diffuseTexture, diffuseTextureLayer,
+        Color4{specularColor}, specularTexture, specularTextureLayer,
+        normalTexture, normalTextureLayer, Matrix3{},
         MaterialAlphaMode::Opaque, 0.5f, shininess, mat};
 
     /* Needs to be explicit on GCC 4.8 and Clang 3.8 so it can properly upcast
