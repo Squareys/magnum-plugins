@@ -1400,16 +1400,13 @@ std::string TinyGltfImporter::doMaterialName(const UnsignedInt id) {
 /* textureMatrix should be an empty Optional when parsing the first texture.
    The function will fill it and then use to check consistency of the transform
    for subsequent textures. */
-bool TinyGltfImporter::materialTexture(const char* name, const Int texture, const Int texCoord, const tinygltf::Value& extensions, UnsignedInt& index, Containers::Optional<Matrix3>& textureMatrix, PhongMaterialData::Flags& flags) const {
+bool TinyGltfImporter::materialTexture(const char* name, const Int texture, const Int texCoord, const tinygltf::Value& extensions, UnsignedInt& index, UnsignedInt& layer, Containers::Optional<Matrix3>& textureMatrix, PhongMaterialData::Flags& flags) const {
     if(UnsignedInt(texture) >= _d->model.textures.size()) {
         Error{} << "Trade::TinyGltfImporter::material():" << name << "index" << texture << "out of bounds for" << _d->model.textures.size() << "textures";
         return false;
     }
 
-    if(texCoord != 0) {
-        Error{} << "Trade::TinyGltfImporter::material(): multiple texture coordinate sets are not supported";
-        return false;
-    }
+    layer = texCoord;
 
     /* Texture transform. Because texture coordinates were Y-flipped, we first
        unflip them back, apply the transform (which assumes origin at bottom
@@ -1530,6 +1527,7 @@ Containers::Pointer<AbstractMaterialData> TinyGltfImporter::doMaterial(const Uns
     /* Textures */
     Containers::Optional<Matrix3> textureMatrix;
     UnsignedInt diffuseTexture{}, specularTexture{};
+    UnsignedInt diffuseTextureLayer{}, specularTextureLayer{};
     Color4 diffuseColor{1.0f};
     Color3 specularColor{1.0f};
     Float shininess{80.0f};
@@ -1542,7 +1540,7 @@ Containers::Pointer<AbstractMaterialData> TinyGltfImporter::doMaterial(const Uns
                 diffuseTextureValue.Get("index").Get<int>(),
                 diffuseTextureValue.Get("texCoord").Get<int>(),
                 diffuseTextureValue.Get("extensions"),
-                diffuseTexture, textureMatrix, flags))
+                diffuseTexture, diffuseTextureLayer, textureMatrix, flags))
                 return nullptr;
 
             flags |= PhongMaterialData::Flag::DiffuseTexture;
@@ -1554,7 +1552,7 @@ Containers::Pointer<AbstractMaterialData> TinyGltfImporter::doMaterial(const Uns
                 specularTextureValue.Get("index").Get<int>(),
                 specularTextureValue.Get("texCoord").Get<int>(),
                 specularTextureValue.Get("extensions"),
-                specularTexture, textureMatrix, flags))
+                specularTexture, specularTextureLayer, textureMatrix, flags))
                 return nullptr;
 
             flags |= PhongMaterialData::Flag::SpecularTexture;
@@ -1588,7 +1586,7 @@ Containers::Pointer<AbstractMaterialData> TinyGltfImporter::doMaterial(const Uns
                    std::maps because tinygltf is SO GREAT that there's NO WAY
                    to access extension structures in a consistent way */
                 tinygltf::Value(material.pbrMetallicRoughness.baseColorTexture.extensions),
-                diffuseTexture, textureMatrix, flags))
+                diffuseTexture, diffuseTextureLayer, textureMatrix, flags))
                 return nullptr;
 
             flags |= PhongMaterialData::Flag::DiffuseTexture;
@@ -1599,6 +1597,7 @@ Containers::Pointer<AbstractMaterialData> TinyGltfImporter::doMaterial(const Uns
 
     /* Normal texture */
     UnsignedInt normalTexture{};
+    UnsignedInt normalTextureLayer{};
     {
         const Int index = material.normalTexture.index;
         if(index != -1) {
@@ -1608,7 +1607,7 @@ Containers::Pointer<AbstractMaterialData> TinyGltfImporter::doMaterial(const Uns
                    std::maps because tinygltf is SO GREAT that there's NO WAY
                    to access extension structures in a consistent way */
                 tinygltf::Value(material.normalTexture.extensions),
-                normalTexture, textureMatrix, flags))
+                normalTexture, normalTextureLayer, textureMatrix, flags))
                 return nullptr;
 
             flags |= PhongMaterialData::Flag::NormalTexture;
@@ -1617,9 +1616,10 @@ Containers::Pointer<AbstractMaterialData> TinyGltfImporter::doMaterial(const Uns
 
     /* Put things together */
     Containers::Pointer<PhongMaterialData> data{Containers::InPlaceInit, flags,
-        0x000000ff_rgbaf, 0u,
-        diffuseColor, diffuseTexture,
-        specularColor, specularTexture, normalTexture,
+        0x000000ff_rgbaf, 0u, 0u,
+        diffuseColor, diffuseTexture, diffuseTextureLayer,
+        specularColor, specularTexture, specularTextureLayer,
+        normalTexture, normalTextureLayer
         textureMatrix ? *textureMatrix : Matrix3{},
         alphaMode, alphaMask, shininess, &material};
 
