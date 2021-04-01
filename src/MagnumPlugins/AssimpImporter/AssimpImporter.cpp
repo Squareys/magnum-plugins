@@ -32,6 +32,7 @@
 #include <Corrade/Containers/ArrayView.h>
 #include <Corrade/Containers/GrowableArray.h>
 #include <Corrade/Containers/Optional.h>
+#include <Corrade/Containers/Pointer.h>
 #include <Corrade/Utility/Algorithms.h>
 #include <Corrade/Utility/ConfigurationGroup.h>
 #include <Corrade/Utility/DebugStl.h>
@@ -44,6 +45,7 @@
 #include <Magnum/PixelFormat.h>
 #include <Magnum/PixelStorage.h>
 #include <Magnum/Trade/ArrayAllocator.h>
+#include <Magnum/Trade/AnimationData.h>
 #include <Magnum/Trade/CameraData.h>
 #include <Magnum/Trade/ImageData.h>
 #include <Magnum/Trade/LightData.h>
@@ -95,6 +97,8 @@ struct AssimpImporter::File {
     std::unordered_map<const aiNode*, std::pair<Trade::ObjectInstanceType3D, UnsignedInt>> nodeInstances;
     std::unordered_map<std::string, UnsignedInt> materialIndicesForName;
     std::unordered_map<const aiMaterial*, UnsignedInt> textureIndices;
+
+    Containers::Pointer<std::unordered_map<std::string, UnsignedInt>> animationsForName;
 
     /* Mapping for multi-mesh nodes:
        (in the following, "node" is an aiNode,
@@ -359,22 +363,22 @@ void AssimpImporter::doOpenData(const Containers::ArrayView<const char> data) {
         /* Store first possible texture index for this material, next textures
            use successive indices. */
         _f->textureIndices[mat] = textureIndex;
-        for(std::size_t i = 0; i != mat->mNumProperties; ++i) {
+        for(std::size_t j = 0; j != mat->mNumProperties; ++j) {
             /* We're only interested in AI_MATKEY_TEXTURE_* properties */
-            const aiMaterialProperty& property = *mat->mProperties[i];
+            const aiMaterialProperty& property = *mat->mProperties[j];
             if(Containers::StringView{property.mKey.C_Str(), property.mKey.length} != _AI_MATKEY_TEXTURE_BASE) continue;
 
             /* For images ensure we have an unique path so each file isn't
                imported more than once. Each image then points to i-th property
                of the material, which is then used to retrieve its path again. */
-            Containers::StringView texturePath = materialPropertyString(property);
-            auto uniqueImage = uniqueImages.emplace(texturePath, _f->images.size());
-            if(uniqueImage.second) _f->images.emplace_back(mat, i);
+            Containers::StringView texturePathView = materialPropertyString(property);
+            auto uniqueImage = uniqueImages.emplace(texturePathView, _f->images.size());
+            if(uniqueImage.second) _f->images.emplace_back(mat, j);
 
             /* Each texture points to i-th property of the material, which is
                then used to retrieve related info, plus an index into the
                unique images array */
-            _f->textures.emplace_back(mat, i, uniqueImage.first->second);
+            _f->textures.emplace_back(mat, j, uniqueImage.first->second);
             ++textureIndex;
         }
     }
@@ -1117,6 +1121,138 @@ Containers::Optional<ImageData2D> AssimpImporter::doImage2D(const UnsignedInt id
 
     return importer->image2D(0, level);
 }
+
+UnsignedInt AssimpImporter::doAnimationCount() const {
+    /* If the animations are merged, there's at most one */
+    if(configuration().value<bool>("mergeAnimationClips"))
+        return _f->scene->mNumAnimations ? 1 : 0;
+
+    return _f->scene->mNumAnimations;
+}
+
+Int AssimpImporter::doAnimationForName(const std::string& name) {
+    /* If the animations are merged, don't report any names */
+    if(configuration().value<bool>("mergeAnimationClips")) return -1;
+
+    if(!_f->animationsForName) {
+        _f->animationsForName.emplace();
+        _f->animationsForName->reserve(_f->scene->mNumAnimations);
+        for(std::size_t i = 0; i != _f->scene->mNumAnimations; ++i)
+            _f->animationsForName->emplace(std::string(_f->scene->mAnimations[i]->mName.C_Str()), i);
+    }
+
+    const auto found = _f->animationsForName->find(name);
+    return found == _f->animationsForName->end() ? -1 : found->second;
+}
+
+std::string AssimpImporter::doAnimationName(UnsignedInt id) {
+    /* If the animations are merged, don't report any names */
+    if(configuration().value<bool>("mergeAnimationClips")) return {};
+    return _f->scene->mAnimations[id]->mName.C_Str();
+}
+
+namespace {
+
+template<class V> void postprocessSplineTrack(const std::size_t timeTrackUsed, const Containers::ArrayView<const Float> keys, const Containers::ArrayView<Math::CubicHermite<V>> values) {
+    /* Already processed, don't do that again */
+    if(timeTrackUsed != ~std::size_t{}) return;
+
+    CORRADE_INTERNAL_ASSERT(keys.size() == values.size());
+    if(keys.size() < 2) return;
+
+    /* Convert the `a` values to `n` and the `b` values to `m` as described in
+       https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#appendix-c-spline-interpolation
+       Unfortunately I was not able to find any concrete name for this, so it's
+       not part of the CubicHermite implementation but is kept here locally. */
+    for(std::size_t i = 0; i < keys.size() - 1; ++i) {
+        const Float timeDifference = keys[i + 1] - keys[i];
+        values[i].outTangent() *= timeDifference;
+        values[i + 1].inTangent() *= timeDifference;
+    }
+}
+
+}
+
+Containers::Optional<AnimationData> AssimpImporter::doAnimation(UnsignedInt id) {
+    /* Import either a single animation or all of them together. At the moment,
+       Blender doesn't really support cinematic animations (affecting multiple
+       objects): https://blender.stackexchange.com/q/5689. And since
+       https://github.com/KhronosGroup/glTF-Blender-Exporter/pull/166, these
+       are exported as a set of object-specific clips, which may not be wanted,
+       so we give the users an option to merge them all together. */
+    const std::size_t animationBegin =
+        configuration().value<bool>("mergeAnimationClips") ? 0 : id;
+    const std::size_t animationEnd =
+        configuration().value<bool>("mergeAnimationClips") ? _f->scene->mNumAnimations : id + 1;
+
+    /* Populate the data array */
+    /**
+     * @todo Once memory-mapped files are supported, this can all go away
+     *      except when spline tracks are present -- in that case we need to
+     *      postprocess them and can't just use the memory directly.
+     */
+    Containers::Array<char> data;
+
+    /* Calculate total track count. If merging all animations together, this is
+       the sum of all clip track counts. */
+    std::size_t trackCount = 0;
+    for(std::size_t a = animationBegin; a != animationEnd; ++a)
+        trackCount += _f->scene->mAnimations[a]->mNumChannels;
+
+    /* Import all tracks */
+    bool hadToRenormalize = false;
+    std::size_t trackId = 0;
+    Containers::Array<Trade::AnimationTrackData> tracks{trackCount};
+    for(std::size_t a = animationBegin; a != animationEnd; ++a) {
+        const aiAnimation* animation = _f->scene->mAnimations[a];
+        for(std::size_t c = 0; c != animation->mNumChannels; ++c) {
+            const aiNodeAnim* channel = animation->mChannels[c];
+            const UnsignedInt target = doObject3DForName(channel->mNodeName.C_Str());
+
+            /* Interpolation mode */
+            Animation::Interpolation interpolation = Animation::Interpolation::Linear;
+            AnimationTrackTargetType targetType;
+            AnimationTrackType resultType;
+            AnimationTrackType type;
+
+            /* Translation */
+            Animation::TrackViewStorage<const Float> track;
+            if(channel->mNumPositionKeys) {
+                const size_t offset = data.size();
+                const size_t keyCount = channel->mNumPositionKeys;
+                Containers::arrayResize(data, Containers::ValueInit, data.size() + keyCount*(sizeof(Vector3) + sizeof(Float)));
+                Containers::ArrayView<Float> keys = Containers::arrayCast<float>(
+                    data.suffix(offset).prefix(keyCount*sizeof(Float)));
+                Containers::ArrayView<Vector3> values = Containers::arrayCast<Vector3>(
+                    data.suffix(offset).suffix(keyCount*sizeof(Float)));
+
+                for(size_t k = 0; k < channel->mNumPositionKeys; ++k) {
+                    /* Convert double to float keys */
+                    keys[k] = channel->mPositionKeys[k].mTime;
+                    values[k] = Vector3::from(&channel->mPositionKeys[k].mValue[0]);
+                }
+
+                targetType = AnimationTrackTargetType::Translation3D;
+                resultType = AnimationTrackType::Vector3;
+                type = AnimationTrackType::Vector3;
+                track = Animation::TrackView<const Float, const Vector3>{
+                    keys, values, interpolation,
+                    animationInterpolatorFor<Vector3>(interpolation),
+                    Animation::Extrapolation::Constant};
+            }
+
+            tracks[trackId++] = AnimationTrackData{type, resultType, targetType, target, track};
+        }
+    }
+
+    if(hadToRenormalize)
+        Warning{} << "Trade::AssimpImporter::animation(): quaternions in some rotation tracks were renormalized";
+
+    return AnimationData{std::move(data), std::move(tracks),
+        configuration().value<bool>("mergeAnimationClips") ? nullptr :
+        &_f->scene->mAnimations[id]};
+}
+
 
 const void* AssimpImporter::doImporterState() const {
     return _f->scene;
